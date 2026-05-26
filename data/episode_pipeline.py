@@ -181,6 +181,7 @@ def main_step2(episodes: list[dict], output_dir: str, book_filter: str = None):
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="에피소드 DB 파이프라인")
     parser.add_argument("--step", type=int, choices=[1, 2], required=True)
     parser.add_argument("--book", type=str, default=None, help="특정 책만 처리 (예: 마태복음)")
