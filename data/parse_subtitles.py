@@ -60,21 +60,23 @@ def compute_ranges(episodes: list[dict], bible: dict) -> list[dict]:
             else:
                 prev_ch = next_ep["start_ch"] - 1
                 book_verses = bible.get(book, [])
-                last_v = max(
-                    (v["verse"] for v in book_verses if v["chapter"] == prev_ch),
-                    default=1,
-                )
+                matched = [v["verse"] for v in book_verses if v["chapter"] == prev_ch]
+                if not matched:
+                    raise ValueError(
+                        f"No verses found for {book} chapter {prev_ch}. "
+                        f"Check BOOK_ABBR mapping and bible.json."
+                    )
                 ep["end_ch"] = prev_ch
-                ep["end_v"] = last_v
+                ep["end_v"] = max(matched)
         else:
             book_verses = bible.get(book, [])
-            if book_verses:
-                last = max(book_verses, key=lambda v: (v["chapter"], v["verse"]))
-                ep["end_ch"] = last["chapter"]
-                ep["end_v"] = last["verse"]
-            else:
-                ep["end_ch"] = ep["start_ch"]
-                ep["end_v"] = ep["start_v"]
+            if not book_verses:
+                raise ValueError(
+                    f"Book '{book}' not found in bible. Check BOOK_ABBR mapping."
+                )
+            last = max(book_verses, key=lambda v: (v["chapter"], v["verse"]))
+            ep["end_ch"] = last["chapter"]
+            ep["end_v"] = last["verse"]
 
         result.append(ep)
     return result
