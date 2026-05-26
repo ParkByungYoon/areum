@@ -27,7 +27,8 @@ def test_save_contains_concern():
         path = f.name
     try:
         save_prayer("외로워요", SAMPLE_VERSE, "연결 메시지", path)
-        content = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as fh:
+            content = fh.read()
         assert "외로워요" in content
     finally:
         os.unlink(path)
@@ -38,7 +39,8 @@ def test_save_contains_verse_ref():
         path = f.name
     try:
         save_prayer("외로워요", SAMPLE_VERSE, "연결 메시지", path)
-        content = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as fh:
+            content = fh.read()
         assert "누가복음 15:20" in content
     finally:
         os.unlink(path)
@@ -50,7 +52,8 @@ def test_saves_accumulate():
     try:
         save_prayer("첫 번째 기도", SAMPLE_VERSE, "연결1", path)
         save_prayer("두 번째 기도", SAMPLE_VERSE, "연결2", path)
-        content = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as fh:
+            content = fh.read()
         assert "첫 번째 기도" in content
         assert "두 번째 기도" in content
     finally:
