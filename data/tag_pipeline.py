@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import anthropic
 from dotenv import load_dotenv
@@ -31,7 +32,11 @@ def tag_batch(verses: list[dict]) -> list[dict]:
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": content}],
     )
-    tags_list = json.loads(response.content[0].text)
+    raw = response.content[0].text.strip()
+    # Strip markdown code blocks if model wraps response in ```json ... ```
+    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
+    tags_list = json.loads(raw)
     return [
         {
             **verses[t["idx"]],
