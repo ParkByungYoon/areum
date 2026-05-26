@@ -46,6 +46,19 @@ def tag_batch(verses: list[dict]) -> list[dict]:
     ]
 
 
+def tag_batch_with_retry(verses: list[dict], retries: int = 3) -> list[dict]:
+    for attempt in range(retries):
+        try:
+            return tag_batch(verses)
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 5 * (attempt + 1)
+                print(f"  재시도 {attempt + 1}/{retries - 1} ({wait}s 대기): {e}")
+                time.sleep(wait)
+            else:
+                raise
+
+
 def run_pipeline(
     raw_path: str = "data/luke_raw.json",
     output_path: str = "data/luke_tagged.json",
@@ -59,26 +72,27 @@ def run_pipeline(
         with open(output_path, encoding="utf-8") as f:
             tagged = json.load(f)
 
-    start_idx = len(tagged)
-    if start_idx == len(all_verses):
+    # Gap-fill: find verses missing by chapter:verse identity
+    tagged_ids = {(v["chapter"], v["verse"]) for v in tagged}
+    missing = [v for v in all_verses if (v["chapter"], v["verse"]) not in tagged_ids]
+
+    if not missing:
         print("이미 완료됨.")
         return
 
-    remaining = all_verses[start_idx:]
+    print(f"남은 절: {len(missing)}개")
 
-    for i in range(0, len(remaining), batch_size):
-        batch = remaining[i : i + batch_size]
-        current = start_idx + i + 1
-        end = start_idx + i + len(batch)
-        print(f"태그 중... {current}~{end} / {len(all_verses)}")
+    for i in range(0, len(missing), batch_size):
+        batch = missing[i : i + batch_size]
+        refs = ", ".join(f"{v['chapter']}:{v['verse']}" for v in batch)
+        print(f"태그 중... {refs} ({i + 1}~{min(i + batch_size, len(missing))} / {len(missing)})")
         try:
-            result = tag_batch(batch)
+            result = tag_batch_with_retry(batch)
             tagged.extend(result)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(tagged, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"오류 (batch {i}): {e}")
-            time.sleep(5)
+            print(f"오류 (건너뜀): {e}")
 
     print(f"태그 완료: {len(tagged)}절 → {output_path}")
 
