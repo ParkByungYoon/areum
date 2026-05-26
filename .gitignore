@@ -1,0 +1,9 @@
+.env
+bible.json
+data/luke_raw.json
+data/luke_tagged.json
+data/tags.json
+prayers.md
+__pycache__/
+*.pyc
+.pytest_cache/
