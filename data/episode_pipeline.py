@@ -46,3 +46,46 @@ def extract_verses(bible: dict, book: str, start_ch: int, start_v: int, end_ch: 
         and (v["chapter"], v["verse"]) <= (end_ch, end_v)
     ]
     return "\n".join(selected)
+
+
+def episode_filepath(output_dir: str, episode: dict) -> Path:
+    return Path(output_dir) / episode["book"] / f"{episode['slug']}.md"
+
+
+def save_episode(output_dir: str, episode: dict, step1_text: str):
+    fp = episode_filepath(output_dir, episode)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    ref = f"{episode['book']} {episode['start_ch']}:{episode['start_v']}-{episode['end_ch']}:{episode['end_v']}"
+    content = (
+        f"# {episode['title']}\n"
+        f"**범위**: {ref}\n\n"
+        f"## 1-step (상황)\n{step1_text}\n\n"
+        f"## 2-step (의미)\n"
+    )
+    fp.write_text(content, encoding="utf-8")
+
+
+def update_step2(filepath: str, step2_text: str):
+    fp = Path(filepath)
+    content = fp.read_text(encoding="utf-8")
+    marker = "## 2-step (의미)\n"
+    idx = content.find(marker)
+    if idx == -1:
+        return
+    fp.write_text(content[:idx + len(marker)] + step2_text + "\n", encoding="utf-8")
+
+
+def needs_step1(output_dir: str, episode: dict) -> bool:
+    return not episode_filepath(output_dir, episode).exists()
+
+
+def needs_step2(output_dir: str, episode: dict) -> bool:
+    fp = episode_filepath(output_dir, episode)
+    if not fp.exists():
+        return False
+    content = fp.read_text(encoding="utf-8")
+    marker = "## 2-step (의미)\n"
+    idx = content.find(marker)
+    if idx == -1:
+        return False
+    return content[idx + len(marker):].strip() == ""
