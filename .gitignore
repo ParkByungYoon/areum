@@ -3,6 +3,7 @@ bible.json
 data/luke_raw.json
 data/luke_tagged.json
 data/tags.json
+data/episodes/
 prayers.md
 __pycache__/
 *.pyc

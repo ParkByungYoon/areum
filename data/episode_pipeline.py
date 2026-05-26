@@ -133,3 +133,65 @@ def run_step2(episode: dict, step1_text: str) -> str:
         return response.content[0].text.strip()
 
     return call_with_retry(call)
+
+
+def _read_step1_from_file(fp: Path) -> str:
+    content = fp.read_text(encoding="utf-8")
+    marker = "## 1-step (상황)\n"
+    idx = content.find(marker)
+    if idx == -1:
+        return ""
+    end = content.find("\n## ", idx + len(marker))
+    return content[idx + len(marker):end].strip() if end != -1 else content[idx + len(marker):].strip()
+
+
+def main_step1(episodes: list[dict], bible: dict, output_dir: str, book_filter: str = None):
+    targets = [
+        ep for ep in episodes
+        if (book_filter is None or ep["book"] == book_filter) and needs_step1(output_dir, ep)
+    ]
+    print(f"Step 1: {len(targets)}개 에피소드 처리 예정")
+    for i, ep in enumerate(targets, 1):
+        print(f"[{i}/{len(targets)}] {ep['book']} — {ep['title']}")
+        verses = extract_verses(bible, ep["book"], ep["start_ch"], ep["start_v"], ep["end_ch"], ep["end_v"])
+        try:
+            step1 = run_step1(ep, verses)
+            save_episode(output_dir, ep, step1)
+        except Exception as e:
+            print(f"  오류 (건너뜀): {e}")
+    print("Step 1 완료.")
+
+
+def main_step2(episodes: list[dict], output_dir: str, book_filter: str = None):
+    targets = [
+        ep for ep in episodes
+        if (book_filter is None or ep["book"] == book_filter) and needs_step2(output_dir, ep)
+    ]
+    print(f"Step 2: {len(targets)}개 에피소드 처리 예정")
+    for i, ep in enumerate(targets, 1):
+        print(f"[{i}/{len(targets)}] {ep['book']} — {ep['title']}")
+        fp = episode_filepath(output_dir, ep)
+        step1_text = _read_step1_from_file(fp)
+        try:
+            step2 = run_step2(ep, step1_text)
+            update_step2(str(fp), step2)
+        except Exception as e:
+            print(f"  오류 (건너뜀): {e}")
+    print("Step 2 완료.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="에피소드 DB 파이프라인")
+    parser.add_argument("--step", type=int, choices=[1, 2], required=True)
+    parser.add_argument("--book", type=str, default=None, help="특정 책만 처리 (예: 마태복음)")
+    parser.add_argument("--output", type=str, default="data/episodes")
+    args = parser.parse_args()
+
+    episodes_raw = parse_subtitles("subtitle.md")
+    bible = load_bible("bible.json")
+    episodes = compute_ranges(episodes_raw, bible)
+
+    if args.step == 1:
+        main_step1(episodes, bible, args.output, args.book)
+    else:
+        main_step2(episodes, args.output, args.book)
