@@ -89,3 +89,47 @@ def needs_step2(output_dir: str, episode: dict) -> bool:
     if idx == -1:
         return False
     return content[idx + len(marker):].strip() == ""
+
+
+def call_with_retry(fn, retries: int = 3):
+    for attempt in range(retries):
+        try:
+            return fn()
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 5 * (attempt + 1)
+                print(f"  재시도 {attempt + 1}/{retries - 1} ({wait}s 대기): {e}")
+                time.sleep(wait)
+            else:
+                raise
+
+
+def run_step1(episode: dict, verses: str) -> str:
+    ref = f"{episode['book']} {episode['start_ch']}:{episode['start_v']}-{episode['end_ch']}:{episode['end_v']}"
+    user_msg = f"제목: {episode['title']}\n범위: {ref}\n원문:\n{verses}"
+
+    def call():
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            system=STEP1_SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        return response.content[0].text.strip()
+
+    return call_with_retry(call)
+
+
+def run_step2(episode: dict, step1_text: str) -> str:
+    user_msg = f"제목: {episode['title']}\n상황 요약:\n{step1_text}"
+
+    def call():
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=400,
+            system=STEP2_SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        return response.content[0].text.strip()
+
+    return call_with_retry(call)

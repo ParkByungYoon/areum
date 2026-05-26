@@ -133,3 +133,50 @@ def test_needs_step2_filled_section():
 def test_needs_step2_no_file_returns_false():
     with tempfile.TemporaryDirectory() as tmpdir:
         assert needs_step2(tmpdir, SAMPLE_EPISODE) is False
+
+
+from unittest.mock import patch, MagicMock
+from data.episode_pipeline import run_step1, run_step2, call_with_retry
+
+
+def test_run_step1_calls_haiku():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = "  상황 요약  "
+    with patch("data.episode_pipeline.client.messages.create", return_value=mock_resp) as mock_create:
+        result = run_step1(SAMPLE_EPISODE, "1:1 태초에...")
+    assert result == "상황 요약"
+    assert mock_create.call_args.kwargs["model"] == "claude-haiku-4-5-20251001"
+
+
+def test_run_step2_calls_sonnet():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = "  의미 해석  "
+    with patch("data.episode_pipeline.client.messages.create", return_value=mock_resp) as mock_create:
+        result = run_step2(SAMPLE_EPISODE, "상황 요약")
+    assert result == "의미 해석"
+    assert mock_create.call_args.kwargs["model"] == "claude-sonnet-4-6"
+
+
+def test_call_with_retry_succeeds_first_try():
+    fn = MagicMock(return_value="ok")
+    assert call_with_retry(fn) == "ok"
+    assert fn.call_count == 1
+
+
+def test_call_with_retry_retries_on_failure():
+    fn = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "ok"])
+    with patch("data.episode_pipeline.time.sleep"):
+        result = call_with_retry(fn, retries=3)
+    assert result == "ok"
+    assert fn.call_count == 3
+
+
+def test_call_with_retry_raises_after_max():
+    fn = MagicMock(side_effect=Exception("always fails"))
+    with patch("data.episode_pipeline.time.sleep"):
+        try:
+            call_with_retry(fn, retries=3)
+            assert False, "Should have raised"
+        except Exception as e:
+            assert str(e) == "always fails"
+    assert fn.call_count == 3
