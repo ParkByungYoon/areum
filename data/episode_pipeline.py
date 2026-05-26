@@ -153,8 +153,8 @@ def main_step1(episodes: list[dict], bible: dict, output_dir: str, book_filter: 
     print(f"Step 1: {len(targets)}개 에피소드 처리 예정")
     for i, ep in enumerate(targets, 1):
         print(f"[{i}/{len(targets)}] {ep['book']} — {ep['title']}")
-        verses = extract_verses(bible, ep["book"], ep["start_ch"], ep["start_v"], ep["end_ch"], ep["end_v"])
         try:
+            verses = extract_verses(bible, ep["book"], ep["start_ch"], ep["start_v"], ep["end_ch"], ep["end_v"])
             step1 = run_step1(ep, verses)
             save_episode(output_dir, ep, step1)
         except Exception as e:
@@ -170,9 +170,9 @@ def main_step2(episodes: list[dict], output_dir: str, book_filter: str = None):
     print(f"Step 2: {len(targets)}개 에피소드 처리 예정")
     for i, ep in enumerate(targets, 1):
         print(f"[{i}/{len(targets)}] {ep['book']} — {ep['title']}")
-        fp = episode_filepath(output_dir, ep)
-        step1_text = _read_step1_from_file(fp)
         try:
+            fp = episode_filepath(output_dir, ep)
+            step1_text = _read_step1_from_file(fp)
             step2 = run_step2(ep, step1_text)
             update_step2(str(fp), step2)
         except Exception as e:
