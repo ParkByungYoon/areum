@@ -1,0 +1,48 @@
+import json
+import os
+import time
+import argparse
+from pathlib import Path
+
+import anthropic
+from dotenv import load_dotenv
+
+from data.parse_subtitles import parse_subtitles, compute_ranges
+
+load_dotenv()
+client = anthropic.Anthropic()
+
+STEP1_SYSTEM = """성경 에피소드의 등장인물, 사건, 배경을 3-5문장으로 요약하세요.
+무엇이 일어났는가, 누가, 왜, 어떤 상황에서. 해석 없이 사실만."""
+
+STEP2_SYSTEM = """아래 에피소드 상황 요약을 바탕으로 신학적·감정적 의미를 3-5문장으로
+추출하세요. 이 에피소드의 핵심이 무엇인지, 어떤 사람의 어떤 상황에
+닿을 수 있는지. AI가 해석을 지시하지 않고 연결점만 제시한다."""
+
+
+def load_bible(path: str = "bible.json") -> dict:
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    bible = {}
+    for book in raw:
+        name = book["korean"]
+        verses = []
+        for chapter in book["chapters"]:
+            for v in chapter["verses"]:
+                verses.append({
+                    "chapter": int(v["chapterNum"]),
+                    "verse": int(v["verseNum"]),
+                    "text": v["verse"],
+                })
+        bible[name] = verses
+    return bible
+
+
+def extract_verses(bible: dict, book: str, start_ch: int, start_v: int, end_ch: int, end_v: int) -> str:
+    selected = [
+        f"{v['chapter']}:{v['verse']} {v['text']}"
+        for v in bible.get(book, [])
+        if (v["chapter"], v["verse"]) >= (start_ch, start_v)
+        and (v["chapter"], v["verse"]) <= (end_ch, end_v)
+    ]
+    return "\n".join(selected)
