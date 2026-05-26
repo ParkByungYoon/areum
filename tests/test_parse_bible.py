@@ -26,5 +26,4 @@ def test_verse_structure():
 def test_covers_all_24_chapters():
     verses = extract_luke("bible.json")
     chapters = {v["chapter"] for v in verses}
-    assert min(chapters) == 1
-    assert max(chapters) == 24
+    assert chapters == set(range(1, 25))
