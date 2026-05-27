@@ -14,7 +14,8 @@ load_dotenv()
 client = anthropic.Anthropic()
 
 STEP1_SYSTEM = """성경 에피소드의 등장인물, 사건, 배경을 3-5문장으로 요약하세요.
-무엇이 일어났는가, 누가, 왜, 어떤 상황에서. 해석 없이 사실만."""
+무엇이 일어났는가, 누가, 왜, 어떤 상황에서. 해석 없이 사실만.
+마크다운 헤더, 볼드, 번호, 목록 없이 연속된 산문으로만 작성하세요."""
 
 STEP2_SYSTEM = """아래 에피소드 상황 요약을 바탕으로 신학적·감정적 의미를 3-5문장으로
 추출하세요. 이 에피소드의 핵심이 무엇인지, 어떤 사람의 어떤 상황에
@@ -112,7 +113,7 @@ def run_step1(episode: dict, verses: str) -> str:
     def call():
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=400,
+            max_tokens=800,
             system=STEP1_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )
@@ -127,7 +128,7 @@ def run_step2(episode: dict, step1_text: str) -> str:
     def call():
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=400,
+            max_tokens=800,
             system=STEP2_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )
