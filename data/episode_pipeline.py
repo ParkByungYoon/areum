@@ -128,7 +128,7 @@ def run_step2(episode: dict, step1_text: str) -> str:
     def call():
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=800,
+            max_tokens=1000,
             system=STEP2_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
         )
