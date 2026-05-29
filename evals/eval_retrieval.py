@@ -62,3 +62,15 @@ def load_episodes(episodes_dir: str = EPISODES_DIR) -> list[dict]:
         content = md_file.read_text(encoding="utf-8")
         episodes.append(parse_episode_file(content, book, slug))
     return episodes
+
+
+def tokenize(text: str) -> list[str]:
+    return [t for t in re.split(r'[\s\W]+', text) if t]
+
+
+def search_bm25(episodes: list[dict], query: str, top_k: int = 5) -> list[dict]:
+    corpus = [tokenize(ep["text"]) for ep in episodes]
+    bm25 = BM25Okapi(corpus)
+    scores = bm25.get_scores(tokenize(query))
+    indexed = sorted(range(len(episodes)), key=lambda i: scores[i], reverse=True)
+    return [{**episodes[i], "score": float(scores[i])} for i in indexed[:top_k]]
