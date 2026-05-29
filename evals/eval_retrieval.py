@@ -211,3 +211,13 @@ def to_result(ep: dict) -> dict:
         "score": round(ep["score"], 4),
         "step2": ep.get("step2", ""),
     }
+
+
+def load_queries(path: str = QUERIES_FILE) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_queries(queries: list[dict], path: str = QUERIES_FILE) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(queries, f, ensure_ascii=False, indent=2)
