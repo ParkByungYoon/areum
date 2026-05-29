@@ -5,7 +5,11 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
-from evals.eval_retrieval import parse_episode_file, load_episodes, tokenize, search_bm25
+from evals.eval_retrieval import (
+    parse_episode_file, load_episodes,
+    tokenize, search_bm25,
+    cosine_similarity, search_embedding,
+)
 
 
 def test_parse_episode_basic():
@@ -109,3 +113,45 @@ def test_search_bm25_does_not_modify_episodes():
     original_keys = set(SAMPLE_EPISODES[0].keys())
     search_bm25(SAMPLE_EPISODES, "배신", top_k=1)
     assert set(SAMPLE_EPISODES[0].keys()) == original_keys
+
+
+# --- Embedding ---
+
+
+def test_cosine_similarity_identical():
+    assert cosine_similarity([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
+
+
+def test_cosine_similarity_orthogonal():
+    assert cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+
+
+def test_cosine_similarity_zero_vector():
+    assert cosine_similarity([0.0, 0.0], [1.0, 0.0]) == pytest.approx(0.0)
+
+
+def test_search_embedding_orders_by_similarity():
+    cache = {
+        "a": [1.0, 0.0],
+        "b": [0.0, 1.0],
+        "c": [0.7, 0.7],
+    }
+    query_embedding = [1.0, 0.0]
+    results = search_embedding(SAMPLE_EPISODES, query_embedding, cache, top_k=1)
+    assert results[0]["slug"] == "a"
+
+
+def test_search_embedding_has_score():
+    cache = {"a": [1.0, 0.0], "b": [0.0, 1.0], "c": [0.5, 0.5]}
+    results = search_embedding(SAMPLE_EPISODES, [1.0, 0.0], cache, top_k=3)
+    for r in results:
+        assert "score" in r
+        assert 0.0 <= r["score"] <= 1.0 + 1e-9
+
+
+def test_search_embedding_skips_missing_cache():
+    cache = {"a": [1.0, 0.0]}  # b, c missing
+    results = search_embedding(SAMPLE_EPISODES, [1.0, 0.0], cache, top_k=5)
+    slugs = [r["slug"] for r in results]
+    assert "b" not in slugs
+    assert "c" not in slugs

@@ -74,3 +74,61 @@ def search_bm25(episodes: list[dict], query: str, top_k: int = 5) -> list[dict]:
     scores = bm25.get_scores(tokenize(query))
     indexed = sorted(range(len(episodes)), key=lambda i: scores[i], reverse=True)
     return [{**episodes[i], "score": float(scores[i])} for i in indexed[:top_k]]
+
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def load_embeddings_cache(cache_file: str = EMBEDDINGS_CACHE_FILE) -> dict:
+    if Path(cache_file).exists():
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_embeddings_cache(cache: dict, cache_file: str = EMBEDDINGS_CACHE_FILE) -> None:
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False)
+
+
+def embed_episodes(episodes: list[dict], cache: dict) -> dict:
+    missing = [ep for ep in episodes if ep["slug"] not in cache]
+    if not missing:
+        return cache
+    print(f"  임베딩 생성 중... {len(missing)}개 (API 호출)")
+    batch_size = 100
+    for i in range(0, len(missing), batch_size):
+        batch = missing[i:i + batch_size]
+        response = openai_client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=[ep["text"] for ep in batch],
+        )
+        for ep, emb_obj in zip(batch, response.data):
+            cache[ep["slug"]] = emb_obj.embedding
+    return cache
+
+
+def embed_query(query: str) -> list[float]:
+    response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=[query])
+    return response.data[0].embedding
+
+
+def search_embedding(
+    episodes: list[dict],
+    query_embedding: list[float],
+    cache: dict,
+    top_k: int = 5,
+) -> list[dict]:
+    scored = [
+        (ep, cosine_similarity(query_embedding, cache[ep["slug"]]))
+        for ep in episodes
+        if ep["slug"] in cache
+    ]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [{**ep, "score": score} for ep, score in scored[:top_k]]
