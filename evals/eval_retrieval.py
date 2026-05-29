@@ -154,7 +154,9 @@ def search_hybrid(
     bm25_raw = list(bm25.get_scores(tokenize(query)))
 
     emb_raw = [
-        cosine_similarity(query_embedding, cache.get(ep["slug"], []))
+        cosine_similarity(query_embedding, cache[ep["slug"]])
+        if ep["slug"] in cache
+        else 0.0
         for ep in episodes
     ]
 
@@ -187,7 +189,11 @@ def rerank_with_llm(query: str, candidates: list[dict], top_k: int = 5) -> list[
     raw = response.content[0].text.strip()
     raw = re.sub(r'^```(?:json)?\s*', '', raw)
     raw = re.sub(r'\s*```$', '', raw)
-    slugs = json.loads(raw)
+    try:
+        slugs = json.loads(raw)
+    except json.JSONDecodeError:
+        print(f"  [LLM] JSON 파싱 실패, 원래 순서 유지: {raw[:80]}")
+        return [{**ep, "score": float(len(candidates) - i)} for i, ep in enumerate(candidates[:top_k])]
 
     slug_to_ep = {ep["slug"]: ep for ep in candidates}
     reranked = [slug_to_ep[s] for s in slugs if s in slug_to_ep]

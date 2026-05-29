@@ -234,6 +234,16 @@ def test_rerank_handles_markdown_code_block():
     assert results[0]["slug"] == "a"
 
 
+def test_rerank_falls_back_on_invalid_json():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = "Sorry, I cannot process this request."
+    candidates = _make_candidates()
+    with patch("evals.eval_retrieval.anthropic_client.messages.create", return_value=mock_resp):
+        results = rerank_with_llm("배신", candidates, top_k=3)
+    assert len(results) == 3
+    assert results[0]["slug"] == candidates[0]["slug"]
+
+
 # --- to_result ---
 
 
@@ -253,29 +263,23 @@ def test_to_result_score_rounded():
 
 
 def test_save_and_load_queries_roundtrip():
-    import tempfile
     queries = [
         {"query": "테스트 쿼리"},
         {"query": "두 번째 쿼리", "results": {"bm25": []}},
     ]
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    ) as f:
-        path = f.name
-    save_queries(queries, path)
-    loaded = load_queries(path)
+    with tempfile.TemporaryDirectory() as d:
+        path = str(Path(d) / "queries.json")
+        save_queries(queries, path)
+        loaded = load_queries(path)
     assert loaded[0]["query"] == "테스트 쿼리"
     assert "results" in loaded[1]
     assert loaded[1]["results"]["bm25"] == []
 
 
 def test_save_queries_is_utf8():
-    import tempfile
     queries = [{"query": "한글 쿼리"}]
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    ) as f:
-        path = f.name
-    save_queries(queries, path)
-    raw = Path(path).read_text(encoding="utf-8")
+    with tempfile.TemporaryDirectory() as d:
+        path = str(Path(d) / "queries.json")
+        save_queries(queries, path)
+        raw = Path(path).read_text(encoding="utf-8")
     assert "한글 쿼리" in raw
