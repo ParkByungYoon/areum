@@ -23,10 +23,12 @@ anthropic_client = anthropic.Anthropic()
 
 def parse_episode_file(content: str, book: str, slug: str) -> dict:
     title = ""
+    range_ = ""
     for line in content.split("\n"):
         if line.startswith("# "):
             title = line[2:].strip()
-            break
+        elif line.startswith("**범위**:"):
+            range_ = line[len("**범위**:"):].strip()
 
     step1_marker = "## 1-step (상황)\n"
     step2_marker = "## 2-step (의미)\n"
@@ -48,6 +50,7 @@ def parse_episode_file(content: str, book: str, slug: str) -> dict:
         "book": book,
         "title": title,
         "slug": slug,
+        "range": range_,
         "step1": step1,
         "step2": step2,
         "text": text,
@@ -214,6 +217,7 @@ def to_result(ep: dict) -> dict:
         "book": ep["book"],
         "title": ep["title"],
         "slug": ep["slug"],
+        "range": ep.get("range", ""),
         "score": round(ep["score"], 4),
         "step2": ep.get("step2", ""),
     }

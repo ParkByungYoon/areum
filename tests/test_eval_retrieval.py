@@ -28,6 +28,7 @@ def test_parse_episode_basic():
     assert ep["book"] == "마태복음"
     assert ep["title"] == "예수의 계보"
     assert ep["slug"] == "001_예수의_계보"
+    assert ep["range"] == "마태복음 1:1-1:17"
     assert ep["step1"] == "족보 내용이다."
     assert ep["step2"] == "계보의 의미이다."
     assert "예수의 계보" in ep["text"]
@@ -66,16 +67,19 @@ def test_load_episodes_structure():
 SAMPLE_EPISODES = [
     {
         "book": "마태복음", "title": "배신", "slug": "a",
+        "range": "마태복음 1:1-1:5",
         "step1": "동료에게 배신당했다", "step2": "믿음의 상실",
         "text": "배신 동료 믿음 상실",
     },
     {
         "book": "마태복음", "title": "사랑", "slug": "b",
+        "range": "마태복음 2:1-2:5",
         "step1": "가족의 사랑", "step2": "기쁨 감사",
         "text": "사랑 가족 기쁨 감사",
     },
     {
         "book": "마태복음", "title": "두려움", "slug": "c",
+        "range": "마태복음 3:1-3:5",
         "step1": "앞이 안 보인다", "step2": "두려움과 평안",
         "text": "두려움 앞 평안",
     },
@@ -250,7 +254,7 @@ def test_rerank_falls_back_on_invalid_json():
 def test_to_result_keys():
     ep = {**SAMPLE_EPISODES[0], "score": 7.123456}
     result = to_result(ep)
-    assert set(result.keys()) == {"book", "title", "slug", "score", "step2"}
+    assert set(result.keys()) == {"book", "title", "slug", "range", "score", "step2"}
 
 
 def test_to_result_score_rounded():
