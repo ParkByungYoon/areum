@@ -221,3 +221,91 @@ def load_queries(path: str = QUERIES_FILE) -> list[dict]:
 def save_queries(queries: list[dict], path: str = QUERIES_FILE) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(queries, f, ensure_ascii=False, indent=2)
+
+
+def run_eval(
+    strategies: list[str],
+    top_k: int,
+    alpha: float,
+    llm_pool: int,
+) -> None:
+    print("에피소드 로딩 중...")
+    episodes = load_episodes()
+    print(f"에피소드 {len(episodes)}개 로딩 완료.\n")
+
+    queries = load_queries()
+    cache = {}
+
+    needs_embedding = any(s in strategies for s in ["embedding", "hybrid"])
+    if needs_embedding:
+        cache = load_embeddings_cache()
+        cache = embed_episodes(episodes, cache)
+        save_embeddings_cache(cache)
+
+    for i, q in enumerate(queries):
+        query_text = q["query"]
+        existing = q.get("results", {})
+        pending = [s for s in strategies if s not in existing]
+
+        if not pending:
+            print(f"[{i+1}/{len(queries)}] 스킵 (완료): {query_text[:40]}")
+            continue
+
+        print(f"=== 쿼리 {i+1}/{len(queries)}: \"{query_text}\" ===\n")
+
+        if "results" not in q:
+            q["results"] = {}
+
+        query_embedding = None
+        if needs_embedding and any(s in pending for s in ["embedding", "hybrid"]):
+            query_embedding = embed_query(query_text)
+
+        for strategy in pending:
+            if strategy == "bm25":
+                results = search_bm25(episodes, query_text, top_k)
+            elif strategy == "embedding":
+                results = search_embedding(episodes, query_embedding, cache, top_k)
+            elif strategy == "hybrid":
+                results = search_hybrid(
+                    episodes, query_text, query_embedding, cache, alpha, top_k
+                )
+            elif strategy == "llm":
+                candidates = search_bm25(episodes, query_text, llm_pool)
+                results = rerank_with_llm(query_text, candidates, top_k)
+            else:
+                continue
+
+            q["results"][strategy] = [to_result(r) for r in results]
+
+            print(f"[{strategy.upper()}]")
+            for j, r in enumerate(results, 1):
+                preview = (r.get("step2") or "")[:100].replace("\n", " ")
+                print(f"  {j}. {r['book']} — {r['title']} ({r['score']:.3f})")
+                if preview:
+                    print(f"     {preview}")
+            print()
+
+        save_queries(queries)
+
+    print(f"완료. 결과 저장 → {QUERIES_FILE}")
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description="에피소드 검색 전략 비교 평가")
+    parser.add_argument(
+        "--strategies", nargs="+",
+        default=["bm25", "embedding", "hybrid", "llm"],
+        choices=["bm25", "embedding", "hybrid", "llm"],
+    )
+    parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument("--llm-pool", type=int, default=20)
+    args = parser.parse_args()
+
+    run_eval(
+        strategies=args.strategies,
+        top_k=args.top_k,
+        alpha=args.alpha,
+        llm_pool=args.llm_pool,
+    )
