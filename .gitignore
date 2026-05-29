@@ -8,3 +8,4 @@ prayers.md
 __pycache__/
 *.pyc
 .pytest_cache/
+evals/embeddings_cache.json
