@@ -132,3 +132,35 @@ def search_embedding(
     ]
     scored.sort(key=lambda x: x[1], reverse=True)
     return [{**ep, "score": score} for ep, score in scored[:top_k]]
+
+
+def normalize_scores(scores: list[float]) -> list[float]:
+    min_s, max_s = min(scores), max(scores)
+    if max_s == min_s:
+        return [0.0] * len(scores)
+    return [(s - min_s) / (max_s - min_s) for s in scores]
+
+
+def search_hybrid(
+    episodes: list[dict],
+    query: str,
+    query_embedding: list[float],
+    cache: dict,
+    alpha: float = 0.5,
+    top_k: int = 5,
+) -> list[dict]:
+    corpus = [tokenize(ep["text"]) for ep in episodes]
+    bm25 = BM25Okapi(corpus)
+    bm25_raw = list(bm25.get_scores(tokenize(query)))
+
+    emb_raw = [
+        cosine_similarity(query_embedding, cache.get(ep["slug"], []))
+        for ep in episodes
+    ]
+
+    bm25_norm = normalize_scores(bm25_raw)
+    emb_norm = normalize_scores(emb_raw)
+
+    combined = [alpha * b + (1 - alpha) * e for b, e in zip(bm25_norm, emb_norm)]
+    indexed = sorted(range(len(episodes)), key=lambda i: combined[i], reverse=True)
+    return [{**episodes[i], "score": combined[i]} for i in indexed[:top_k]]

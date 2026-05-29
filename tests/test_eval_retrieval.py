@@ -9,6 +9,7 @@ from evals.eval_retrieval import (
     parse_episode_file, load_episodes,
     tokenize, search_bm25,
     cosine_similarity, search_embedding,
+    normalize_scores, search_hybrid,
 )
 
 
@@ -155,3 +156,39 @@ def test_search_embedding_skips_missing_cache():
     slugs = [r["slug"] for r in results]
     assert "b" not in slugs
     assert "c" not in slugs
+
+
+# --- Hybrid ---
+
+
+def test_normalize_scores_basic():
+    normalized = normalize_scores([0.0, 5.0, 10.0])
+    assert normalized[0] == pytest.approx(0.0)
+    assert normalized[2] == pytest.approx(1.0)
+    assert normalized[1] == pytest.approx(0.5)
+
+
+def test_normalize_scores_all_equal():
+    normalized = normalize_scores([3.0, 3.0, 3.0])
+    assert normalized == [0.0, 0.0, 0.0]
+
+
+def test_normalize_scores_single():
+    assert normalize_scores([5.0]) == [0.0]
+
+
+def test_search_hybrid_alpha1_top_matches_bm25():
+    cache = {"a": [1.0, 0.0], "b": [0.0, 1.0], "c": [0.5, 0.5]}
+    bm25_top = search_bm25(SAMPLE_EPISODES, "배신 동료", top_k=1)[0]["slug"]
+    hybrid_top = search_hybrid(
+        SAMPLE_EPISODES, "배신 동료", [1.0, 0.0], cache, alpha=1.0, top_k=1
+    )[0]["slug"]
+    assert hybrid_top == bm25_top
+
+
+def test_search_hybrid_has_score():
+    cache = {"a": [1.0, 0.0], "b": [0.0, 1.0], "c": [0.5, 0.5]}
+    results = search_hybrid(SAMPLE_EPISODES, "배신", [1.0, 0.0], cache, alpha=0.5, top_k=3)
+    for r in results:
+        assert "score" in r
+        assert 0.0 <= r["score"] <= 1.0 + 1e-9
