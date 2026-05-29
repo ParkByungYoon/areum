@@ -10,6 +10,7 @@ from evals.eval_retrieval import (
     tokenize, search_bm25,
     cosine_similarity, search_embedding,
     normalize_scores, search_hybrid,
+    rerank_with_llm, to_result,
 )
 
 
@@ -192,3 +193,56 @@ def test_search_hybrid_has_score():
     for r in results:
         assert "score" in r
         assert 0.0 <= r["score"] <= 1.0 + 1e-9
+
+
+# --- LLM Reranking ---
+
+
+def _make_candidates():
+    return [
+        {**SAMPLE_EPISODES[0], "score": 3.0},
+        {**SAMPLE_EPISODES[1], "score": 2.0},
+        {**SAMPLE_EPISODES[2], "score": 1.0},
+    ]
+
+
+def test_rerank_with_llm_reorders():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = '["b", "a", "c"]'
+    with patch("evals.eval_retrieval.anthropic_client.messages.create", return_value=mock_resp):
+        results = rerank_with_llm("사랑에 관해", _make_candidates(), top_k=2)
+    assert results[0]["slug"] == "b"
+    assert results[1]["slug"] == "a"
+    assert len(results) == 2
+
+
+def test_rerank_fills_remaining_when_partial_response():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = '["c"]'
+    with patch("evals.eval_retrieval.anthropic_client.messages.create", return_value=mock_resp):
+        results = rerank_with_llm("두려움", _make_candidates(), top_k=3)
+    assert results[0]["slug"] == "c"
+    assert len(results) == 3
+
+
+def test_rerank_handles_markdown_code_block():
+    mock_resp = MagicMock()
+    mock_resp.content[0].text = '```json\n["a", "b"]\n```'
+    with patch("evals.eval_retrieval.anthropic_client.messages.create", return_value=mock_resp):
+        results = rerank_with_llm("배신", _make_candidates(), top_k=2)
+    assert results[0]["slug"] == "a"
+
+
+# --- to_result ---
+
+
+def test_to_result_keys():
+    ep = {**SAMPLE_EPISODES[0], "score": 7.123456}
+    result = to_result(ep)
+    assert set(result.keys()) == {"book", "title", "slug", "score", "step2"}
+
+
+def test_to_result_score_rounded():
+    ep = {**SAMPLE_EPISODES[0], "score": 7.123456}
+    result = to_result(ep)
+    assert result["score"] == pytest.approx(7.1235, abs=0.001)

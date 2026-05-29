@@ -164,3 +164,50 @@ def search_hybrid(
     combined = [alpha * b + (1 - alpha) * e for b, e in zip(bm25_norm, emb_norm)]
     indexed = sorted(range(len(episodes)), key=lambda i: combined[i], reverse=True)
     return [{**episodes[i], "score": combined[i]} for i in indexed[:top_k]]
+
+
+def rerank_with_llm(query: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
+    lines = []
+    for ep in candidates:
+        lines.append(f"[{ep['slug']}] {ep['book']} — {ep['title']}")
+        if ep.get("step2"):
+            lines.append(f"  {ep['step2'][:150]}")
+
+    prompt = (
+        f"고민: {query}\n\n에피소드:\n" + "\n".join(lines) +
+        "\n\n관련도 높은 순서로 slug 목록을 JSON 배열로만 반환하세요."
+    )
+    response = anthropic_client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=500,
+        system="성경 에피소드를 사용자 고민과의 관련도로 정렬합니다. JSON 배열만 반환하세요.",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = response.content[0].text.strip()
+    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
+    slugs = json.loads(raw)
+
+    slug_to_ep = {ep["slug"]: ep for ep in candidates}
+    reranked = [slug_to_ep[s] for s in slugs if s in slug_to_ep]
+
+    seen = {ep["slug"] for ep in reranked}
+    for ep in candidates:
+        if ep["slug"] not in seen:
+            reranked.append(ep)
+
+    return [
+        {**ep, "score": float(len(reranked) - i)}
+        for i, ep in enumerate(reranked[:top_k])
+    ]
+
+
+def to_result(ep: dict) -> dict:
+    return {
+        "book": ep["book"],
+        "title": ep["title"],
+        "slug": ep["slug"],
+        "score": round(ep["score"], 4),
+        "step2": ep.get("step2", ""),
+    }
