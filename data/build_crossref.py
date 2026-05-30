@@ -2,6 +2,7 @@ import json
 import sqlite3
 
 GOSPEL_BOOKS = (40, 41, 42, 43)
+VOTES_THRESHOLD = 10
 
 BOOK_NAMES = {
     1: "창세기", 2: "출애굽기", 3: "레위기", 4: "민수기", 5: "신명기",
@@ -22,7 +23,7 @@ BOOK_NAMES = {
 }
 
 
-def load_crossrefs_for_episode(rows: list[tuple], episode: dict) -> list[dict]:
+def load_crossrefs_for_episode(rows: list[tuple], episode: dict, min_votes: int = VOTES_THRESHOLD) -> list[dict]:
     book = episode["book"]
     chapter = episode["chapter"]
     v_start = episode["verse_start"]
@@ -31,7 +32,13 @@ def load_crossrefs_for_episode(rows: list[tuple], episode: dict) -> list[dict]:
     result = []
     for row in rows:
         from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes = row
-        if from_book == book and from_chapter == chapter and v_start <= from_verse <= v_end and to_book in GOSPEL_BOOKS:
+        if (
+            from_book == book
+            and from_chapter == chapter
+            and v_start <= from_verse <= v_end
+            and to_book in GOSPEL_BOOKS
+            and votes >= min_votes
+        ):
             result.append({
                 "from_verse": from_verse,
                 "to_book": to_book,
@@ -43,6 +50,46 @@ def load_crossrefs_for_episode(rows: list[tuple], episode: dict) -> list[dict]:
             })
 
     return sorted(result, key=lambda r: r["votes"], reverse=True)
+
+
+def _build_connected_episodes(episodes_with_refs: list[dict]) -> list[list[dict]]:
+    """to_verse_range가 다른 에피소드의 from_verse_range 안에 속하면 직접 연결."""
+    n = len(episodes_with_refs)
+
+    # 인접 그래프: cross-ref의 to_verse가 상대 에피소드 본문 범위 안에 있을 때만 연결
+    adj: list[set[int]] = [set() for _ in range(n)]
+    for i, ep in enumerate(episodes_with_refs):
+        for ref in ep["cross_references"]:
+            t_book = ref["to_book"]
+            t_ch = ref["to_chapter"]
+            t_vs = ref["to_verse_start"]
+            for j, target in enumerate(episodes_with_refs):
+                if (
+                    j != i
+                    and target["book"] == t_book
+                    and target["from_chapter"] == t_ch
+                    and target["from_verse_start"] <= t_vs <= target["from_verse_end"]
+                ):
+                    adj[i].add(j)
+                    adj[j].add(i)
+
+    # 1-hop 이웃만 반환 (전이 없음 — 직접 참조한 에피소드만)
+    result = []
+    for i in range(n):
+        connected = [
+            {
+                "book": episodes_with_refs[j]["book"],
+                "book_name": episodes_with_refs[j]["book_name"],
+                "episode": episodes_with_refs[j]["episode"],
+                "from_chapter": episodes_with_refs[j]["from_chapter"],
+                "from_verse_start": episodes_with_refs[j]["from_verse_start"],
+                "from_verse_end": episodes_with_refs[j]["from_verse_end"],
+            }
+            for j in sorted(adj[i])
+        ]
+        result.append(connected)
+
+    return result
 
 
 def build(
@@ -57,16 +104,17 @@ def build(
     cur = conn.cursor()
     placeholders = ",".join("?" * len(GOSPEL_BOOKS))
     cur.execute(
-        f"SELECT from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes FROM cross_references WHERE from_book IN ({placeholders}) AND to_book IN ({placeholders})",
+        f"SELECT from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes "
+        f"FROM cross_references WHERE from_book IN ({placeholders}) AND to_book IN ({placeholders})",
         GOSPEL_BOOKS * 2,
     )
     all_rows = cur.fetchall()
     conn.close()
 
-    output = []
+    episodes_with_refs = []
     for ep in episodes:
         refs = load_crossrefs_for_episode(all_rows, ep)
-        output.append({
+        episodes_with_refs.append({
             "book": ep["book"],
             "book_name": ep["book_name"],
             "episode": ep["episode"],
@@ -76,11 +124,18 @@ def build(
             "cross_references": refs,
         })
 
+    connected_list = _build_connected_episodes(episodes_with_refs)
+
+    output = []
+    for ep, connected in zip(episodes_with_refs, connected_list):
+        output.append({**ep, "connected_episodes": connected})
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
     total_refs = sum(len(ep["cross_references"]) for ep in output)
-    print(f"완료: {len(output)}개 에피소드, 총 {total_refs}개 cross-reference → {output_path}")
+    total_connected = sum(len(ep["connected_episodes"]) for ep in output)
+    print(f"완료: {len(output)}개 에피소드, {total_refs}개 cross-reference, {total_connected}개 connected 연결 → {output_path}")
 
 
 if __name__ == "__main__":
