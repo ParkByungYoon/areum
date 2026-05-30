@@ -10,3 +10,5 @@ __pycache__/
 .pytest_cache/
 evals/embeddings_cache.json
 .worktrees/
+data/cross_references.db
+data/gospels_crossrefs.json
