@@ -31,7 +31,7 @@ def load_crossrefs_for_episode(rows: list[tuple], episode: dict) -> list[dict]:
     result = []
     for row in rows:
         from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes = row
-        if from_book == book and from_chapter == chapter and v_start <= from_verse <= v_end:
+        if from_book == book and from_chapter == chapter and v_start <= from_verse <= v_end and to_book in GOSPEL_BOOKS:
             result.append({
                 "from_verse": from_verse,
                 "to_book": to_book,
@@ -57,8 +57,8 @@ def build(
     cur = conn.cursor()
     placeholders = ",".join("?" * len(GOSPEL_BOOKS))
     cur.execute(
-        f"SELECT from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes FROM cross_references WHERE from_book IN ({placeholders})",
-        GOSPEL_BOOKS,
+        f"SELECT from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes FROM cross_references WHERE from_book IN ({placeholders}) AND to_book IN ({placeholders})",
+        GOSPEL_BOOKS * 2,
     )
     all_rows = cur.fetchall()
     conn.close()
