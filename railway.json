@@ -6,7 +6,7 @@
   },
   "deploy": {
     "startCommand": "uvicorn api.main:app --host 0.0.0.0 --port $PORT",
-    "healthcheckPath": "/api/match",
+    "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
   }
 }

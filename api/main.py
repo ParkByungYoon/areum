@@ -8,6 +8,12 @@ from api.routes.prayer import router as prayer_router
 
 app = FastAPI(title="아름 API")
 
+
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"status": "ok"}
+
+
 app.include_router(match_router, prefix="/api")
 app.include_router(episode_router, prefix="/api")
 app.include_router(prayer_router, prefix="/api")
