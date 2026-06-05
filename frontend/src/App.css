@@ -1,0 +1,80 @@
+/* App-level layout — per-screen styles live here */
+
+.screen { display: flex; flex-direction: column; gap: 24px; }
+
+.screen-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.episode-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.episode-situation {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.passage-ref {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.prayer-prompt {
+  text-align: center;
+  padding: 24px 0 8px;
+}
+
+.prayer-prompt p {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 0;
+  width: auto;
+  cursor: pointer;
+}
+.back-btn:hover { color: var(--text); }
+
+.spinner {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.success-msg {
+  background: #eef5f0;
+  border: 1px solid #b8d8c2;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 14px;
+  color: var(--primary);
+  text-align: center;
+}

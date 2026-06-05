@@ -2,7 +2,7 @@ import json
 import sqlite3
 
 GOSPEL_BOOKS = (40, 41, 42, 43)
-VOTES_THRESHOLD = 10
+VOTES_THRESHOLD = 100
 
 BOOK_NAMES = {
     1: "창세기", 2: "출애굽기", 3: "레위기", 4: "민수기", 5: "신명기",
@@ -25,8 +25,9 @@ BOOK_NAMES = {
 
 def load_crossrefs_for_episode(rows: list[tuple], episode: dict, min_votes: int = VOTES_THRESHOLD) -> list[dict]:
     book = episode["book"]
-    chapter = episode["chapter"]
+    ch_start = episode["chapter_start"]
     v_start = episode["verse_start"]
+    ch_end = episode["chapter_end"]
     v_end = episode["verse_end"]
 
     result = []
@@ -34,8 +35,7 @@ def load_crossrefs_for_episode(rows: list[tuple], episode: dict, min_votes: int 
         from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes = row
         if (
             from_book == book
-            and from_chapter == chapter
-            and v_start <= from_verse <= v_end
+            and (ch_start, v_start) <= (from_chapter, from_verse) <= (ch_end, v_end)
             and to_book in GOSPEL_BOOKS
             and votes >= min_votes
         ):
@@ -67,8 +67,7 @@ def _build_connected_episodes(episodes_with_refs: list[dict]) -> list[list[dict]
                 if (
                     j != i
                     and target["book"] == t_book
-                    and target["from_chapter"] == t_ch
-                    and target["from_verse_start"] <= t_vs <= target["from_verse_end"]
+                    and (target["chapter_start"], target["verse_start"]) <= (t_ch, t_vs) <= (target["chapter_end"], target["verse_end"])
                 ):
                     adj[i].add(j)
                     adj[j].add(i)
@@ -81,9 +80,10 @@ def _build_connected_episodes(episodes_with_refs: list[dict]) -> list[list[dict]
                 "book": episodes_with_refs[j]["book"],
                 "book_name": episodes_with_refs[j]["book_name"],
                 "episode": episodes_with_refs[j]["episode"],
-                "from_chapter": episodes_with_refs[j]["from_chapter"],
-                "from_verse_start": episodes_with_refs[j]["from_verse_start"],
-                "from_verse_end": episodes_with_refs[j]["from_verse_end"],
+                "chapter_start": episodes_with_refs[j]["chapter_start"],
+                "verse_start": episodes_with_refs[j]["verse_start"],
+                "chapter_end": episodes_with_refs[j]["chapter_end"],
+                "verse_end": episodes_with_refs[j]["verse_end"],
             }
             for j in sorted(adj[i])
         ]
@@ -118,9 +118,10 @@ def build(
             "book": ep["book"],
             "book_name": ep["book_name"],
             "episode": ep["episode"],
-            "from_chapter": ep["chapter"],
-            "from_verse_start": ep["verse_start"],
-            "from_verse_end": ep["verse_end"],
+            "chapter_start": ep["chapter_start"],
+            "verse_start": ep["verse_start"],
+            "chapter_end": ep["chapter_end"],
+            "verse_end": ep["verse_end"],
             "cross_references": refs,
         })
 

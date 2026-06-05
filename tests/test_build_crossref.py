@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, ".")
 from data.build_crossref import load_crossrefs_for_episode, _build_connected_episodes, BOOK_NAMES
 
-# votes >= 10 (VOTES_THRESHOLD) 인 행만 통과
+# 테스트용 샘플 rows (votes 10~20) — 테스트에서 min_votes=10 명시 사용
 SAMPLE_ROWS = [
     (42, 15, 11, 40, 6, 12, 15, 12),   # 누가 15:11 → 마태 6:12-15, votes=12
     (42, 15, 12, 41, 4, 3, 9, 11),     # 누가 15:12 → 마가 4:3-9, votes=11
@@ -10,39 +10,39 @@ SAMPLE_ROWS = [
     (43, 3, 16, 42, 19, 10, 10, 20),   # 요한 3:16 → 누가 19:10, votes=20
 ]
 
-EPISODE_LUKE = {"book": 42, "book_name": "누가복음", "episode": "탕자의 비유", "chapter": 15, "verse_start": 11, "verse_end": 32}
-EPISODE_JOHN = {"book": 43, "book_name": "요한복음", "episode": "요한복음 3:16", "chapter": 3, "verse_start": 16, "verse_end": 21}
+EPISODE_LUKE = {"book": 42, "book_name": "누가복음", "episode": "탕자의 비유", "chapter_start": 15, "verse_start": 11, "chapter_end": 15, "verse_end": 32}
+EPISODE_JOHN = {"book": 43, "book_name": "요한복음", "episode": "요한복음 3:16", "chapter_start": 3, "verse_start": 16, "chapter_end": 3, "verse_end": 21}
 
 
 def test_filters_by_book_and_verse_range():
-    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE)
+    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE, min_votes=10)
     assert all(r["from_verse"] >= 11 and r["from_verse"] <= 32 for r in refs)
     assert len(refs) == 3
 
 
 def test_votes_threshold_filters_low_votes():
     low_votes_rows = [(42, 15, 11, 40, 6, 12, 15, 5)]  # votes=5 < 10
-    refs = load_crossrefs_for_episode(low_votes_rows, EPISODE_LUKE)
+    refs = load_crossrefs_for_episode(low_votes_rows, EPISODE_LUKE, min_votes=10)
     assert len(refs) == 0
 
 
 def test_different_book_episode():
-    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_JOHN)
+    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_JOHN, min_votes=10)
     assert len(refs) == 1
 
 
 def test_includes_to_verse_range():
-    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE)
+    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE, min_votes=10)
     assert all("to_verse_start" in r and "to_verse_end" in r for r in refs)
 
 
 def test_includes_book_name():
-    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE)
+    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE, min_votes=10)
     assert all("to_book_name" in r for r in refs)
 
 
 def test_sorted_by_votes_desc():
-    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE)
+    refs = load_crossrefs_for_episode(SAMPLE_ROWS, EPISODE_LUKE, min_votes=10)
     votes = [r["votes"] for r in refs]
     assert votes == sorted(votes, reverse=True)
 
@@ -57,7 +57,7 @@ def test_book_names_covers_four_gospels():
 def _make_ep(book, episode, chapter, refs):
     return {
         "book": book, "book_name": BOOK_NAMES[book], "episode": episode,
-        "from_chapter": chapter, "from_verse_start": 1, "from_verse_end": 10,
+        "chapter_start": chapter, "verse_start": 1, "chapter_end": chapter, "verse_end": 10,
         "cross_references": refs,
     }
 

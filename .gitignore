@@ -12,3 +12,10 @@ evals/embeddings_cache.json
 .worktrees/
 data/cross_references.db
 data/gospels_crossrefs.json
+prayers.db
+prayers.json
+.omc/
+_smoke_*.py
+frontend/node_modules/
+frontend/dist/
+data/nt_episodes.json
